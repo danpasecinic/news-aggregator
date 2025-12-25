@@ -2,7 +2,6 @@ import asyncio
 import logging
 import re
 from functools import lru_cache
-from urllib.parse import urlparse
 
 from deep_translator import GoogleTranslator
 from telegram import Bot
@@ -17,26 +16,6 @@ logger = logging.getLogger(__name__)
 MIN_DELAY = 1.0
 MAX_DELAY = 5.0
 BATCH_SIZE = 10
-
-CATEGORY_TAGS = {
-    "war": "#війна",
-    "ato": "#війна",
-    "politics": "#політика",
-    "polytics": "#політика",
-    "economy": "#економіка",
-    "economics": "#економіка",
-    "biznes": "#бізнес",
-    "business": "#бізнес",
-    "sport": "#спорт",
-    "culture": "#культура",
-    "world": "#світ",
-    "ukraine": "#україна",
-    "society": "#суспільство",
-    "energetika": "#енергетика",
-    "infrastruktura": "#інфраструктура",
-    "news": "",
-    "main": "",
-}
 
 SOURCE_ICONS = {
     "RBC Ukraine": "🔴",
@@ -109,26 +88,11 @@ class TelegramBot:
         return any(re.search(p, text, re.IGNORECASE) for p in SKIP_PATTERNS)
 
     @staticmethod
-    def _extract_category(url: str) -> str:
-        try:
-            path = urlparse(url).path.lower()
-            parts = [p for p in path.split("/") if p and not p.isdigit() and len(p) > 2]
-
-            for part in parts:
-                for key, tag in CATEGORY_TAGS.items():
-                    if key in part and tag:
-                        return tag
-        except Exception:
-            pass
-        return ""
-
-    @staticmethod
     def _get_source_icon(source: str) -> str:
         return SOURCE_ICONS.get(source, "📰")
 
     def format_message(self, article: Article) -> str:
         icon = self._get_source_icon(article.source)
-        category = self._escape_md(self._extract_category(article.url))
         time_str = article.timestamp.strftime("%H:%M") if article.timestamp else ""
 
         title = article.title
@@ -137,13 +101,9 @@ class TelegramBot:
 
         lines = [
             f"{icon} *{self._escape_md(article.source)}*",
+            "",
+            self._escape_md(title),
         ]
-
-        if category:
-            lines[0] += f"  {category}"
-
-        lines.append("")
-        lines.append(self._escape_md(title))
         lines.append("")
 
         if article.other_sources:
@@ -250,8 +210,6 @@ class TelegramBot:
 
         for article in articles[:15]:
             icon = self._get_source_icon(article.source)
-            category = self._escape_md(self._extract_category(article.url))
-            tag = f" {category}" if category else ""
             time_str = article.timestamp.strftime("%H:%M") if article.timestamp else ""
             time_part = f" _{time_str}_" if time_str else ""
 
@@ -259,7 +217,7 @@ class TelegramBot:
             if article.source in ENGLISH_SOURCES:
                 title = translate_to_ukrainian(title)
             title = self._escape_md(title)
-            lines.append(f"{icon}{tag}{time_part}")
+            lines.append(f"{icon}{time_part}")
             lines.append(f"[{title}]({article.url})\n")
 
         message = "\n".join(lines)
