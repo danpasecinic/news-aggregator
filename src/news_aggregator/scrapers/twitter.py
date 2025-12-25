@@ -170,4 +170,6 @@ class TwitterScraper(BaseScraper):
             source="Twitter",
             timestamp=timestamp,
             content=text,
+            icon=self.source.icon,
+            language=self.source.language,
         )

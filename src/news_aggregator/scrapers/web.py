@@ -104,15 +104,18 @@ class WebScraper(BaseScraper):
             url=url,
             source=self.name,
             timestamp=timestamp,
+            icon=self.source.icon,
+            language=self.source.language,
         )
 
     def _parse_time(self, time_str: str) -> datetime | None:
         formats = ["%H:%M", "%d.%m.%Y %H:%M", "%Y-%m-%d %H:%M", "%d %B %Y, %H:%M"]
+        now = datetime.now()
         for fmt in formats:
             try:
                 parsed = datetime.strptime(time_str, fmt)
                 if parsed.year == 1900:
-                    parsed = parsed.replace(year=datetime.now().year)
+                    parsed = parsed.replace(year=now.year, month=now.month, day=now.day)
                 return parsed
             except ValueError:
                 continue

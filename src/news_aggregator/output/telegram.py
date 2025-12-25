@@ -17,41 +17,6 @@ MIN_DELAY = 1.0
 MAX_DELAY = 5.0
 BATCH_SIZE = 10
 
-SOURCE_ICONS = {
-    "RBC Ukraine": "🔴",
-    "Pravda": "🟠",
-    "Eurointegration": "🇪🇺",
-    "ZN.UA": "📰",
-    "Ekonomichna Pravda": "💰",
-    "Ukrinform ATO": "⚔️",
-    "Hromadske": "📺",
-    "Radio Svoboda": "🔵",
-    "Suspilne": "🟡",
-    "Twitter": "𝕏",
-    "Bloomberg": "🟧",
-    "Reuters": "🔷",
-    "BBC": "🇬🇧",
-    "The Guardian": "🟣",
-    "NYT": "🗽",
-    "Washington Post": "🏛️",
-    "AP News": "⚡",
-    "Al Jazeera": "🌍",
-    "Axios": "🔶",
-    "CNN": "📺",
-    "Politico": "🏛️",
-    "NPR": "🎙️",
-    "The Economist": "📊",
-    "Forbes": "💵",
-    "Sky News": "🌤️",
-    "DW": "🇩🇪",
-    "France24": "🇫🇷",
-    "Euronews": "🇪🇺",
-    "CGTN": "🇨🇳",
-    "Twitter WarMonitor": "𝕏",
-    "Twitter KyivIndependent": "𝕏",
-    "Twitter UkraineWorld": "𝕏",
-}
-
 SKIP_PATTERNS = [
     r"t\.me/",
     r"telegram",
@@ -59,12 +24,6 @@ SKIP_PATTERNS = [
     r"підписатися",
     r"наш канал",
 ]
-
-ENGLISH_SOURCES = {
-    "Bloomberg", "Reuters", "BBC", "The Guardian", "NYT", "Washington Post",
-    "AP News", "Al Jazeera", "Axios", "CNN", "Politico", "NPR", "The Economist",
-    "Forbes", "Sky News", "DW", "France24", "Euronews", "CGTN",
-}
 
 
 @lru_cache(maxsize=500)
@@ -90,24 +49,14 @@ class TelegramBot:
         text = f"{article.title} {article.url}".lower()
         return any(re.search(p, text, re.IGNORECASE) for p in SKIP_PATTERNS)
 
-    @staticmethod
-    def _get_source_icon(source: str) -> str:
-        return SOURCE_ICONS.get(source, "📰")
-
     def format_message(self, article: Article) -> str:
-        icon = self._get_source_icon(article.source)
         time_str = article.timestamp.strftime("%H:%M") if article.timestamp else ""
 
         title = article.title
-        if article.source in ENGLISH_SOURCES:
+        if article.language == "en":
             title = translate_to_ukrainian(title)
 
-        lines = [
-            f"{icon} *{self._escape_md(article.source)}*",
-            "",
-            self._escape_md(title),
-        ]
-        lines.append("")
+        lines = [f"{article.icon} *{self._escape_md(article.source)}*", "", self._escape_md(title), ""]
 
         if article.other_sources:
             sources_str = ", ".join(article.other_sources[:3])
@@ -165,11 +114,7 @@ class TelegramBot:
 
     async def _send_fallback(self, article: Article) -> bool:
         try:
-            icon = self._get_source_icon(article.source)
-            category = self._extract_category(article.url)
-            tag_str = f" {category}" if category else ""
-
-            plain_message = f"{icon} {article.source}{tag_str}\n\n{article.title}\n\n🔗 {article.url}"
+            plain_message = f"{article.icon} {article.source}\n\n{article.title}\n\n🔗 {article.url}"
             async with self._get_bot() as bot:
                 await bot.send_message(
                     chat_id=self.channel_id,
@@ -212,15 +157,14 @@ class TelegramBot:
         lines = ["📋 *Дайджест новин*\n"]
 
         for article in articles[:15]:
-            icon = self._get_source_icon(article.source)
             time_str = article.timestamp.strftime("%H:%M") if article.timestamp else ""
             time_part = f" _{time_str}_" if time_str else ""
 
             title = article.title[:80]
-            if article.source in ENGLISH_SOURCES:
+            if article.language == "en":
                 title = translate_to_ukrainian(title)
             title = self._escape_md(title)
-            lines.append(f"{icon}{time_part}")
+            lines.append(f"{article.icon}{time_part}")
             lines.append(f"[{title}]({article.url})\n")
 
         message = "\n".join(lines)

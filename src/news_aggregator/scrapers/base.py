@@ -17,6 +17,8 @@ class Article:
     timestamp: datetime | None = None
     content: str | None = None
     other_sources: list[str] = field(default_factory=list)
+    icon: str = "📰"
+    language: str = "uk"
 
     @property
     def id(self) -> str:

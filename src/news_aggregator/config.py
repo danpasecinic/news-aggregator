@@ -36,6 +36,8 @@ class SourceConfig(BaseModel):
     link_prefix: str = ""
     keywords: list[str] = Field(default_factory=list)
     enabled: bool = True
+    icon: str = "📰"
+    language: str = "uk"
 
 
 class Settings(BaseSettings):

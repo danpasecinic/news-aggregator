@@ -42,23 +42,24 @@ class Database:
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     sent BOOLEAN DEFAULT FALSE,
                     duplicate_of TEXT,
-                    other_sources TEXT
+                    other_sources TEXT,
+                    icon TEXT DEFAULT '📰',
+                    language TEXT DEFAULT 'uk'
                 )
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_source ON articles(source)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON articles(timestamp)")
-            try:
-                conn.execute("ALTER TABLE articles ADD COLUMN normalized_title TEXT")
-            except sqlite3.OperationalError:
-                pass
-            try:
-                conn.execute("ALTER TABLE articles ADD COLUMN duplicate_of TEXT")
-            except sqlite3.OperationalError:
-                pass
-            try:
-                conn.execute("ALTER TABLE articles ADD COLUMN other_sources TEXT")
-            except sqlite3.OperationalError:
-                pass
+            for col, default in [
+                ("normalized_title", None),
+                ("duplicate_of", None),
+                ("other_sources", None),
+                ("icon", "'📰'"),
+                ("language", "'uk'"),
+            ]:
+                try:
+                    conn.execute(f"ALTER TABLE articles ADD COLUMN {col} TEXT DEFAULT {default or 'NULL'}")
+                except sqlite3.OperationalError:
+                    pass
             conn.execute("CREATE INDEX IF NOT EXISTS idx_duplicate ON articles(duplicate_of)")
             conn.commit()
 
@@ -99,10 +100,11 @@ class Database:
             if similar:
                 original_id, similarity = similar
                 conn.execute(
-                    """INSERT INTO articles (id, title, normalized_title, url, source, timestamp, content, duplicate_of, sent)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)""",
+                    """INSERT INTO articles (id, title, normalized_title, url, source, timestamp, content, duplicate_of, sent, icon, language)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE, ?, ?)""",
                     (article.id, article.title, normalized, article.url, article.source,
-                     article.timestamp.isoformat() if article.timestamp else None, article.content, original_id)
+                     article.timestamp.isoformat() if article.timestamp else None, article.content, original_id,
+                     article.icon, article.language)
                 )
                 cursor = conn.execute("SELECT other_sources FROM articles WHERE id = ?", (original_id,))
                 row = cursor.fetchone()
@@ -112,10 +114,11 @@ class Database:
                 logger.debug(f"Duplicate ({similarity}%): '{article.title[:40]}' -> '{original_id[:20]}'")
             else:
                 conn.execute(
-                    """INSERT INTO articles (id, title, normalized_title, url, source, timestamp, content)
-                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    """INSERT INTO articles (id, title, normalized_title, url, source, timestamp, content, icon, language)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (article.id, article.title, normalized, article.url, article.source,
-                     article.timestamp.isoformat() if article.timestamp else None, article.content)
+                     article.timestamp.isoformat() if article.timestamp else None, article.content,
+                     article.icon, article.language)
                 )
             conn.commit()
 
@@ -144,6 +147,8 @@ class Database:
                 source=row["source"],
                 timestamp=datetime.fromisoformat(row["timestamp"]) if row["timestamp"] else None,
                 content=row["content"],
+                icon=row["icon"] or "📰",
+                language=row["language"] or "uk",
             )
             other_sources = row["other_sources"]
             if other_sources:

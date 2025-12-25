@@ -83,6 +83,8 @@ class RSSScraper(BaseScraper):
             source=self.name,
             timestamp=timestamp,
             content=desc_elem.text if desc_elem is not None else None,
+            icon=self.source.icon,
+            language=self.source.language,
         )
 
     def _parse_atom_entry(self, entry, ns: dict) -> Article | None:
@@ -109,4 +111,6 @@ class RSSScraper(BaseScraper):
             source=self.name,
             timestamp=timestamp,
             content=summary_elem.text if summary_elem is not None else None,
+            icon=self.source.icon,
+            language=self.source.language,
         )
