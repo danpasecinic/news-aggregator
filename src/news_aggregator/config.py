@@ -8,6 +8,7 @@ class ScrapingConfig(BaseModel):
     interval_minutes: int = 10
     request_timeout: int = 30
     max_articles_per_source: int = 20
+    max_article_age_hours: int = 6
     user_agent: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 
 

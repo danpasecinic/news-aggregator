@@ -145,6 +145,11 @@ class TelegramBot:
         lines.append(self._escape_md(title))
         lines.append("")
 
+        if article.other_sources:
+            sources_str = ", ".join(article.other_sources[:3])
+            lines.append(f"_Також: {self._escape_md(sources_str)}_")
+            lines.append("")
+
         if time_str:
             lines.append(f"⏰ {time_str} • [Читати]({article.url})")
         else:
