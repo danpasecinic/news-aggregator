@@ -1,8 +1,10 @@
 import asyncio
 import logging
 import re
+from functools import lru_cache
 from urllib.parse import urlparse
 
+from deep_translator import GoogleTranslator
 from telegram import Bot
 from telegram.constants import ParseMode
 from telegram.error import RetryAfter, TelegramError
@@ -75,6 +77,20 @@ SKIP_PATTERNS = [
     r"наш канал",
 ]
 
+ENGLISH_SOURCES = {
+    "Bloomberg", "Reuters", "BBC", "The Guardian", "NYT", "Washington Post",
+    "AP News", "Al Jazeera", "Axios", "CNN", "Politico", "NPR", "The Economist",
+    "Forbes", "Sky News", "DW", "France24", "Euronews",
+}
+
+
+@lru_cache(maxsize=500)
+def translate_to_ukrainian(text: str) -> str:
+    try:
+        return GoogleTranslator(source="en", target="uk").translate(text)
+    except Exception:
+        return text
+
 
 class TelegramBot:
     def __init__(self):
@@ -114,6 +130,10 @@ class TelegramBot:
         category = self._escape_md(self._extract_category(article.url))
         time_str = article.timestamp.strftime("%H:%M") if article.timestamp else ""
 
+        title = article.title
+        if article.source in ENGLISH_SOURCES:
+            title = translate_to_ukrainian(title)
+
         lines = [
             f"{icon} *{self._escape_md(article.source)}*",
         ]
@@ -122,7 +142,7 @@ class TelegramBot:
             lines[0] += f"  {category}"
 
         lines.append("")
-        lines.append(self._escape_md(article.title))
+        lines.append(self._escape_md(title))
         lines.append("")
 
         if time_str:
@@ -229,7 +249,10 @@ class TelegramBot:
             time_str = article.timestamp.strftime("%H:%M") if article.timestamp else ""
             time_part = f" _{time_str}_" if time_str else ""
 
-            title = self._escape_md(article.title[:80])
+            title = article.title[:80]
+            if article.source in ENGLISH_SOURCES:
+                title = translate_to_ukrainian(title)
+            title = self._escape_md(title)
             lines.append(f"{icon}{tag}{time_part}")
             lines.append(f"[{title}]({article.url})\n")
 
