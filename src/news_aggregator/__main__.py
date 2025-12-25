@@ -8,7 +8,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from news_aggregator.config import SourceConfig, load_sources, settings
 from news_aggregator.output import TelegramBot
-from news_aggregator.scrapers import RSSScraper, TwitterScraper, WebScraper
+from news_aggregator.scrapers import RSSScraper, TwitterScraper, WebScraper, PlaywrightScraper
 from news_aggregator.scrapers.base import Article
 from news_aggregator.storage import Database
 
@@ -43,6 +43,8 @@ class NewsAggregator:
                 return TwitterScraper(source)
             case "rss":
                 return RSSScraper(source)
+            case "playwright":
+                return PlaywrightScraper(source)
             case _:
                 logger.warning(f"Unknown scraper type: {source.type}")
                 return None
