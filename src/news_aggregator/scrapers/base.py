@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from datetime import datetime
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 import hashlib
 
 from news_aggregator.config import SourceConfig, settings
@@ -13,6 +13,7 @@ class Article:
     source: str
     timestamp: datetime | None = None
     content: str | None = None
+    other_sources: list[str] = field(default_factory=list)
 
     @property
     def id(self) -> str:
@@ -37,6 +38,20 @@ class BaseScraper(ABC):
         pass
 
     def filter_articles(self, articles: list[Article]) -> list[Article]:
-        if not self.keywords:
-            return articles
-        return [a for a in articles if a.matches_keywords(self.keywords)]
+        max_age = timedelta(hours=settings.scraping.max_article_age_hours)
+        cutoff_utc = datetime.now(timezone.utc) - max_age
+        cutoff_naive = datetime.now() - max_age
+
+        filtered = []
+        for a in articles:
+            if a.timestamp:
+                if a.timestamp.tzinfo is not None:
+                    if a.timestamp < cutoff_utc:
+                        continue
+                elif a.timestamp < cutoff_naive:
+                    continue
+            if self.keywords and not a.matches_keywords(self.keywords):
+                continue
+            filtered.append(a)
+
+        return filtered
