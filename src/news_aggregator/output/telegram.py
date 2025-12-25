@@ -224,7 +224,7 @@ class TelegramBot:
 
         for article in articles[:15]:
             icon = self._get_source_icon(article.source)
-            category = self._extract_category(article.url)
+            category = self._escape_md(self._extract_category(article.url))
             tag = f" {category}" if category else ""
             time_str = article.timestamp.strftime("%H:%M") if article.timestamp else ""
             time_part = f" _{time_str}_" if time_str else ""
