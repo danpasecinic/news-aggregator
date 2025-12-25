@@ -4,12 +4,10 @@ services:
     container_name: news-aggregator
     restart: unless-stopped
     environment:
-      - NEWS_TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - NEWS_TELEGRAM_CHANNEL_ID=${TELEGRAM_CHANNEL_ID}
-      - NEWS_TWITTER_USERNAME=${TWITTER_USERNAME}
-      - NEWS_TWITTER_PASSWORD=${TWITTER_PASSWORD}
-      - NEWS_SCRAPE_INTERVAL=${SCRAPE_INTERVAL:-10}
-      - NEWS_LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHANNEL_ID=${TELEGRAM_CHANNEL_ID}
+      - SCRAPE_INTERVAL=${SCRAPE_INTERVAL:-10}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
       - ./data:/app/data
       - ./config:/app/config:ro

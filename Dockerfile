@@ -17,12 +17,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libasound2 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml .
-RUN pip install --no-cache-dir .
+COPY pyproject.toml README.md ./
+COPY src/ src/
 
+RUN pip install --no-cache-dir .
 RUN playwright install chromium --with-deps
 
-COPY src/ src/
 COPY config/ config/
 
 RUN mkdir -p data
