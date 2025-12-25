@@ -63,15 +63,29 @@ class WebScraper(BaseScraper):
         if not self.selectors:
             return None
 
-        title_elem = container.select_one(self.selectors.title)
+        if self.selectors.title:
+            title_elem = container.select_one(self.selectors.title)
+        else:
+            title_elem = container
+
         if not title_elem:
             return None
 
         title = title_elem.get_text(strip=True)
+        if self.selectors.time:
+            time_elem = container.select_one(self.selectors.time)
+            if time_elem:
+                time_text = time_elem.get_text(strip=True)
+                title = title.replace(time_text, "").strip()
+
         if not title:
             return None
 
-        link_elem = container.select_one(self.selectors.link) or title_elem
+        if self.selectors.link:
+            link_elem = container.select_one(self.selectors.link)
+        else:
+            link_elem = container if container.name == "a" else container.find("a")
+
         href = link_elem.get("href") if link_elem else None
         if not href:
             return None
