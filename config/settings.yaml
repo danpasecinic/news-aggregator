@@ -1,0 +1,20 @@
+scraping:
+  interval_minutes: 10
+  request_timeout: 30
+  max_articles_per_source: 20
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+
+storage:
+  database_path: "data/news.db"
+  keep_days: 7
+
+telegram:
+  message_format: |
+    📰 *{source}*
+    {title}
+    🔗 {url}
+    ⏰ {timestamp}
+
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
