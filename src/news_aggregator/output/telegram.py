@@ -67,6 +67,7 @@ SOURCE_ICONS = {
     "DW": "🇩🇪",
     "France24": "🇫🇷",
     "Euronews": "🇪🇺",
+    "CGTN": "🇨🇳",
 }
 
 SKIP_PATTERNS = [
@@ -80,7 +81,7 @@ SKIP_PATTERNS = [
 ENGLISH_SOURCES = {
     "Bloomberg", "Reuters", "BBC", "The Guardian", "NYT", "Washington Post",
     "AP News", "Al Jazeera", "Axios", "CNN", "Politico", "NPR", "The Economist",
-    "Forbes", "Sky News", "DW", "France24", "Euronews",
+    "Forbes", "Sky News", "DW", "France24", "Euronews", "CGTN",
 }
 
 

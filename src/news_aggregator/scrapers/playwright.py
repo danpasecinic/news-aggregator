@@ -99,7 +99,7 @@ class PlaywrightScraper(BaseScraper):
             title=title,
             url=url,
             source=self.name,
-            timestamp=timestamp or datetime.now(),
+            timestamp=timestamp,
         )
 
     @staticmethod

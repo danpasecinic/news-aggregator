@@ -164,6 +164,6 @@ class TwitterScraper(BaseScraper):
             title=f"@{username}: {title}",
             url=url or "",
             source="Twitter",
-            timestamp=timestamp or datetime.now(),
+            timestamp=timestamp,
             content=text,
         )

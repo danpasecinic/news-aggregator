@@ -81,7 +81,7 @@ class RSSScraper(BaseScraper):
             title=title_elem.text or "",
             url=link_elem.text or "",
             source=self.name,
-            timestamp=timestamp or datetime.now(),
+            timestamp=timestamp,
             content=desc_elem.text if desc_elem is not None else None,
         )
 
@@ -107,6 +107,6 @@ class RSSScraper(BaseScraper):
             title=title_elem.text or "",
             url=href,
             source=self.name,
-            timestamp=timestamp or datetime.now(),
+            timestamp=timestamp,
             content=summary_elem.text if summary_elem is not None else None,
         )

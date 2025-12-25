@@ -103,7 +103,7 @@ class WebScraper(BaseScraper):
             title=title,
             url=url,
             source=self.name,
-            timestamp=timestamp or datetime.now(),
+            timestamp=timestamp,
         )
 
     def _parse_time(self, time_str: str) -> datetime | None:
