@@ -47,6 +47,9 @@ SOURCE_ICONS = {
     "France24": "🇫🇷",
     "Euronews": "🇪🇺",
     "CGTN": "🇨🇳",
+    "Twitter WarMonitor": "𝕏",
+    "Twitter KyivIndependent": "𝕏",
+    "Twitter UkraineWorld": "𝕏",
 }
 
 SKIP_PATTERNS = [

@@ -21,6 +21,10 @@ class TwitterScraper(BaseScraper):
         self.password = settings.twitter_password
 
     async def scrape(self) -> list[Article]:
+        logger.info("[Twitter] Scraper disabled")
+        return []
+
+    async def _scrape_disabled(self) -> list[Article]:
         if not self.username or not self.password:
             logger.warning("[Twitter] Credentials not set, skipping")
             return []
@@ -58,7 +62,7 @@ class TwitterScraper(BaseScraper):
 
     async def _ensure_logged_in(self, page: Page) -> bool:
         try:
-            await page.goto("https://twitter.com/home", wait_until="networkidle", timeout=30000)
+            await page.goto("https://twitter.com/home", wait_until="networkidle", timeout=60000)
             await asyncio.sleep(2)
 
             if "login" in page.url.lower():
@@ -74,7 +78,7 @@ class TwitterScraper(BaseScraper):
         try:
             logger.info("[Twitter] Attempting login...")
 
-            await page.goto("https://twitter.com/i/flow/login", wait_until="networkidle")
+            await page.goto("https://twitter.com/i/flow/login", wait_until="networkidle", timeout=60000)
             await asyncio.sleep(2)
 
             username_input = page.get_by_label("Phone, email, or username")
@@ -106,7 +110,7 @@ class TwitterScraper(BaseScraper):
         articles = []
 
         try:
-            await page.goto("https://twitter.com/home", wait_until="networkidle")
+            await page.goto("https://twitter.com/home", wait_until="networkidle", timeout=60000)
             await asyncio.sleep(3)
 
             for _ in range(3):
