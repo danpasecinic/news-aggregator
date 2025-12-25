@@ -1,20 +1,21 @@
 import asyncio
-import os
 import logging
+
 from telegram import Bot
 from telegram.constants import ParseMode
 from telegram.error import TelegramError
 
-from src.scrapers.base import Article
+from news_aggregator.config import settings
+from news_aggregator.scrapers.base import Article
 
 logger = logging.getLogger(__name__)
 
 
 class TelegramBot:
-    def __init__(self, settings: dict):
-        self.token = os.getenv("TELEGRAM_BOT_TOKEN", "")
-        self.channel_id = os.getenv("TELEGRAM_CHANNEL_ID", "")
-        self.message_format = settings.get("telegram", {}).get("message_format", "{title}\n{url}")
+    def __init__(self):
+        self.token = settings.telegram_bot_token
+        self.channel_id = settings.telegram_channel_id
+        self.message_format = settings.telegram.message_format
 
     def _get_bot(self) -> Bot:
         if not self.token:
@@ -22,21 +23,21 @@ class TelegramBot:
         return Bot(token=self.token)
 
     def format_message(self, article: Article) -> str:
-        timestamp_str = ""
-        if article.timestamp:
-            timestamp_str = article.timestamp.strftime("%H:%M %d.%m.%Y")
+        timestamp_str = article.timestamp.strftime("%H:%M %d.%m.%Y") if article.timestamp else ""
 
         return self.message_format.format(
             source=self._escape_md(article.source),
             title=self._escape_md(article.title),
             url=article.url,
-            timestamp=timestamp_str
+            timestamp=timestamp_str,
         )
 
     def _escape_md(self, text: str) -> str:
-        special_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+        special_chars = [
+            "_", "*", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!"
+        ]
         for char in special_chars:
-            text = text.replace(char, f'\\{char}')
+            text = text.replace(char, f"\\{char}")
         return text
 
     async def send_article(self, article: Article) -> bool:
@@ -51,7 +52,7 @@ class TelegramBot:
                     chat_id=self.channel_id,
                     text=message,
                     parse_mode=ParseMode.MARKDOWN_V2,
-                    disable_web_page_preview=False
+                    disable_web_page_preview=False,
                 )
             logger.info(f"Sent: {article.title[:50]}...")
             return True
@@ -67,7 +68,7 @@ class TelegramBot:
                 await bot.send_message(
                     chat_id=self.channel_id,
                     text=plain_message,
-                    disable_web_page_preview=False
+                    disable_web_page_preview=False,
                 )
             return True
         except TelegramError as e:
@@ -77,29 +78,7 @@ class TelegramBot:
     async def send_batch(self, articles: list[Article], delay: float = 1.0) -> int:
         sent_count = 0
         for article in articles:
-            success = await self.send_article(article)
-            if success:
+            if await self.send_article(article):
                 sent_count += 1
             await asyncio.sleep(delay)
         return sent_count
-
-    async def send_status(self, stats: dict):
-        message = (
-            f"📊 *News Aggregator Status*\n\n"
-            f"Total articles: {stats['total']}\n"
-            f"Sent: {stats['sent']}\n"
-            f"Pending: {stats['pending']}\n\n"
-            f"By source:\n"
-        )
-        for source, count in stats.get('by_source', {}).items():
-            message += f"  • {source}: {count}\n"
-
-        try:
-            async with self._get_bot() as bot:
-                await bot.send_message(
-                    chat_id=self.channel_id,
-                    text=message,
-                    parse_mode=ParseMode.MARKDOWN
-                )
-        except TelegramError as e:
-            logger.error(f"Failed to send status: {e}")

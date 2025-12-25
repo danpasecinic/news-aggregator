@@ -1,63 +1,51 @@
 import asyncio
 import logging
-import os
 import sys
-from pathlib import Path
 
-import yaml
-from dotenv import load_dotenv
 from apscheduler import AsyncScheduler
-from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
-from src.scrapers import WebScraper, TwitterScraper, RSSScraper, Article
-from src.storage import Database
-from src.output import TelegramBot
-
-load_dotenv()
+from news_aggregator.config import SourceConfig, load_sources, settings
+from news_aggregator.output import TelegramBot
+from news_aggregator.scrapers import RSSScraper, TwitterScraper, WebScraper
+from news_aggregator.scrapers.base import Article
+from news_aggregator.storage import Database
 
 logging.basicConfig(
-    level=os.getenv("LOG_LEVEL", "INFO"),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=settings.log_level,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
 
 class NewsAggregator:
     def __init__(self):
-        self.settings = self._load_yaml("config/settings.yaml")
-        self.sources = self._load_yaml("config/sources.yaml")
-        self.db = Database(self.settings.get("storage", {}).get("database_path", "data/news.db"))
-        self.telegram = TelegramBot(self.settings)
+        self.sources = load_sources()
+        self.db = Database()
+        self.telegram = TelegramBot()
         self.scrapers = self._init_scrapers()
-
-    @staticmethod
-    def _load_yaml(path: str) -> dict:
-        config_path = Path(path)
-        if not config_path.exists():
-            logger.warning(f"Config file not found: {path}")
-            return {}
-        with open(config_path) as f:
-            return yaml.safe_load(f) or {}
 
     def _init_scrapers(self) -> list:
         scrapers = []
-        for source in self.sources.get("sources", []):
-            if not source.get("enabled", True):
-                continue
-
-            source_type = source.get("type", "web")
-
-            if source_type == "web":
-                scrapers.append(WebScraper(source, self.settings))
-            elif source_type == "twitter":
-                scrapers.append(TwitterScraper(source, self.settings))
-            elif source_type == "rss":
-                scrapers.append(RSSScraper(source, self.settings))
-
-            logger.info(f"Initialized scraper: {source.get('name')}")
-
+        for source in self.sources:
+            scraper = self._create_scraper(source)
+            if scraper:
+                scrapers.append(scraper)
+                logger.info(f"Initialized scraper: {source.name}")
         return scrapers
+
+    def _create_scraper(self, source: SourceConfig):
+        match source.type:
+            case "web":
+                return WebScraper(source)
+            case "twitter":
+                return TwitterScraper(source)
+            case "rss":
+                return RSSScraper(source)
+            case _:
+                logger.warning(f"Unknown scraper type: {source.type}")
+                return None
 
     async def scrape_all(self) -> list[Article]:
         all_articles = []
@@ -106,57 +94,68 @@ class NewsAggregator:
             logger.error(f"Cycle failed: {e}", exc_info=True)
 
     def cleanup(self):
-        keep_days = self.settings.get("storage", {}).get("keep_days", 7)
-        self.db.cleanup_old(keep_days)
+        self.db.cleanup_old()
 
 
-async def main():
+async def run_scheduler():
     aggregator = NewsAggregator()
-
-    if len(sys.argv) > 1:
-        command = sys.argv[1]
-
-        if command == "once":
-            await aggregator.run_cycle()
-            return
-
-        if command == "stats":
-            stats = aggregator.db.get_stats()
-            print(f"Total: {stats['total']}")
-            print(f"Sent: {stats['sent']}")
-            print(f"Pending: {stats['pending']}")
-            for source, count in stats.get('by_source', {}).items():
-                print(f"  {source}: {count}")
-            return
-
-        if command == "cleanup":
-            aggregator.cleanup()
-            return
-
-    interval = int(os.getenv("SCRAPE_INTERVAL", "10"))
+    interval = settings.scrape_interval
 
     async with AsyncScheduler() as scheduler:
         await scheduler.add_schedule(
             aggregator.run_cycle,
             IntervalTrigger(minutes=interval),
-            id="scrape_cycle"
+            id="scrape_cycle",
         )
 
         await scheduler.add_schedule(
             aggregator.cleanup,
             CronTrigger(hour=3),
-            id="cleanup"
+            id="cleanup",
         )
 
         logger.info(f"Scheduler started, running every {interval} minutes")
-
         await aggregator.run_cycle()
-
         await scheduler.run_until_stopped()
 
 
-if __name__ == "__main__":
+async def run_once():
+    aggregator = NewsAggregator()
+    await aggregator.run_cycle()
+
+
+def show_stats():
+    db = Database()
+    stats = db.get_stats()
+    print(f"Total: {stats['total']}")
+    print(f"Sent: {stats['sent']}")
+    print(f"Pending: {stats['pending']}")
+    for source, count in stats.get("by_source", {}).items():
+        print(f"  {source}: {count}")
+
+
+def main():
+    if len(sys.argv) > 1:
+        command = sys.argv[1]
+
+        if command == "once":
+            asyncio.run(run_once())
+            return
+
+        if command == "stats":
+            show_stats()
+            return
+
+        if command == "cleanup":
+            db = Database()
+            db.cleanup_old()
+            return
+
     try:
-        asyncio.run(main())
+        asyncio.run(run_scheduler())
     except KeyboardInterrupt:
         logger.info("Shutting down...")
+
+
+if __name__ == "__main__":
+    main()

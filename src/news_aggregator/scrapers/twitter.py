@@ -1,12 +1,13 @@
 import asyncio
-import logging
-import os
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
-from playwright.async_api import async_playwright, Page
 
-from .base import BaseScraper, Article
+from playwright.async_api import Page, async_playwright
+
+from news_aggregator.config import SourceConfig, settings
+from news_aggregator.scrapers.base import Article, BaseScraper
 
 logger = logging.getLogger(__name__)
 
@@ -14,11 +15,10 @@ COOKIES_PATH = Path("data/twitter_cookies.json")
 
 
 class TwitterScraper(BaseScraper):
-    def __init__(self, config: dict, settings: dict):
-        super().__init__(config)
-        self.username = os.getenv("TWITTER_USERNAME", "")
-        self.password = os.getenv("TWITTER_PASSWORD", "")
-        self.max_articles = settings.get("scraping", {}).get("max_articles_per_source", 20)
+    def __init__(self, source: SourceConfig):
+        super().__init__(source)
+        self.username = settings.twitter_username
+        self.password = settings.twitter_password
 
     async def scrape(self) -> list[Article]:
         if not self.username or not self.password:
@@ -31,7 +31,7 @@ class TwitterScraper(BaseScraper):
                 browser = await p.chromium.launch(headless=True)
                 context = await browser.new_context(
                     viewport={"width": 1280, "height": 800},
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    user_agent=settings.scraping.user_agent,
                 )
 
                 if COOKIES_PATH.exists():
@@ -54,7 +54,7 @@ class TwitterScraper(BaseScraper):
 
         filtered = self.filter_articles(articles)
         logger.info(f"[Twitter] Found {len(articles)} tweets, {len(filtered)} after filtering")
-        return filtered[:self.max_articles]
+        return filtered[: self.max_articles]
 
     async def _ensure_logged_in(self, page: Page) -> bool:
         try:
@@ -116,14 +116,13 @@ class TwitterScraper(BaseScraper):
             tweets = page.get_by_test_id("tweet")
             tweet_elements = await tweets.all()
 
-            for tweet in tweet_elements[:self.max_articles * 2]:
+            for tweet in tweet_elements[: self.max_articles * 2]:
                 try:
                     article = await self._parse_tweet(tweet)
                     if article:
                         articles.append(article)
                 except Exception as e:
                     logger.debug(f"[Twitter] Failed to parse tweet: {e}")
-                    continue
 
         except Exception as e:
             logger.error(f"[Twitter] Feed scraping failed: {e}")
@@ -166,5 +165,5 @@ class TwitterScraper(BaseScraper):
             url=url or "",
             source="Twitter",
             timestamp=timestamp or datetime.now(),
-            content=text
+            content=text,
         )

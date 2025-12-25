@@ -1,34 +1,33 @@
-import httpx
-from bs4 import BeautifulSoup
-from datetime import datetime
 import logging
+from datetime import datetime
 from urllib.parse import urljoin
 
-from .base import BaseScraper, Article
+import httpx
+from bs4 import BeautifulSoup
+
+from news_aggregator.config import SourceConfig, settings
+from news_aggregator.scrapers.base import Article, BaseScraper
 
 logger = logging.getLogger(__name__)
 
 
 class WebScraper(BaseScraper):
-    def __init__(self, config: dict, settings: dict):
-        super().__init__(config)
-        self.url = config["url"]
-        self.selectors = config.get("selectors", {})
-        self.link_prefix = config.get("link_prefix", "")
-        self.timeout = settings.get("scraping", {}).get("request_timeout", 30)
-        self.user_agent = settings.get("scraping", {}).get(
-            "user_agent",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        )
-        self.max_articles = settings.get("scraping", {}).get("max_articles_per_source", 20)
+    def __init__(self, source: SourceConfig):
+        super().__init__(source)
+        self.url = source.url or ""
+        self.selectors = source.selectors
+        self.link_prefix = source.link_prefix
 
     async def scrape(self) -> list[Article]:
+        if not self.url or not self.selectors:
+            return []
+
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(timeout=settings.scraping.request_timeout) as client:
                 response = await client.get(
                     self.url,
-                    headers={"User-Agent": self.user_agent},
-                    follow_redirects=True
+                    headers={"User-Agent": settings.scraping.user_agent},
+                    follow_redirects=True,
                 )
                 response.raise_for_status()
 
@@ -37,7 +36,7 @@ class WebScraper(BaseScraper):
             filtered = self.filter_articles(articles)
 
             logger.info(f"[{self.name}] Found {len(articles)} articles, {len(filtered)} after filtering")
-            return filtered[:self.max_articles]
+            return filtered[: self.max_articles]
 
         except Exception as e:
             logger.error(f"[{self.name}] Scraping failed: {e}")
@@ -45,12 +44,10 @@ class WebScraper(BaseScraper):
 
     def _parse_articles(self, soup: BeautifulSoup) -> list[Article]:
         articles = []
-        container_selector = self.selectors.get("container")
-
-        if not container_selector:
+        if not self.selectors:
             return articles
 
-        containers = soup.select(container_selector)
+        containers = soup.select(self.selectors.container)
 
         for container in containers:
             try:
@@ -59,16 +56,14 @@ class WebScraper(BaseScraper):
                     articles.append(article)
             except Exception as e:
                 logger.debug(f"[{self.name}] Failed to parse article: {e}")
-                continue
 
         return articles
 
     def _parse_single_article(self, container) -> Article | None:
-        title_sel = self.selectors.get("title")
-        link_sel = self.selectors.get("link")
-        time_sel = self.selectors.get("time")
+        if not self.selectors:
+            return None
 
-        title_elem = container.select_one(title_sel) if title_sel else container
+        title_elem = container.select_one(self.selectors.title)
         if not title_elem:
             return None
 
@@ -76,7 +71,7 @@ class WebScraper(BaseScraper):
         if not title:
             return None
 
-        link_elem = container.select_one(link_sel) if link_sel else title_elem
+        link_elem = container.select_one(self.selectors.link) or title_elem
         href = link_elem.get("href") if link_elem else None
         if not href:
             return None
@@ -84,8 +79,8 @@ class WebScraper(BaseScraper):
         url = urljoin(self.link_prefix or self.url, href)
 
         timestamp = None
-        if time_sel:
-            time_elem = container.select_one(time_sel)
+        if self.selectors.time:
+            time_elem = container.select_one(self.selectors.time)
             if time_elem:
                 time_text = time_elem.get_text(strip=True)
                 timestamp = self._parse_time(time_text)
@@ -94,16 +89,11 @@ class WebScraper(BaseScraper):
             title=title,
             url=url,
             source=self.name,
-            timestamp=timestamp or datetime.now()
+            timestamp=timestamp or datetime.now(),
         )
 
     def _parse_time(self, time_str: str) -> datetime | None:
-        formats = [
-            "%H:%M",
-            "%d.%m.%Y %H:%M",
-            "%Y-%m-%d %H:%M",
-            "%d %B %Y, %H:%M",
-        ]
+        formats = ["%H:%M", "%d.%m.%Y %H:%M", "%Y-%m-%d %H:%M", "%d %B %Y, %H:%M"]
         for fmt in formats:
             try:
                 parsed = datetime.strptime(time_str, fmt)

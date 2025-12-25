@@ -1,32 +1,31 @@
-import httpx
+import logging
 from datetime import datetime
 from email.utils import parsedate_to_datetime
-import logging
 from xml.etree import ElementTree
 
-from .base import BaseScraper, Article
+import httpx
+
+from news_aggregator.config import SourceConfig, settings
+from news_aggregator.scrapers.base import Article, BaseScraper
 
 logger = logging.getLogger(__name__)
 
 
 class RSSScraper(BaseScraper):
-    def __init__(self, config: dict, settings: dict):
-        super().__init__(config)
-        self.url = config["url"]
-        self.timeout = settings.get("scraping", {}).get("request_timeout", 30)
-        self.user_agent = settings.get("scraping", {}).get(
-            "user_agent",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        )
-        self.max_articles = settings.get("scraping", {}).get("max_articles_per_source", 20)
+    def __init__(self, source: SourceConfig):
+        super().__init__(source)
+        self.url = source.url or ""
 
     async def scrape(self) -> list[Article]:
+        if not self.url:
+            return []
+
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(timeout=settings.scraping.request_timeout) as client:
                 response = await client.get(
                     self.url,
-                    headers={"User-Agent": self.user_agent},
-                    follow_redirects=True
+                    headers={"User-Agent": settings.scraping.user_agent},
+                    follow_redirects=True,
                 )
                 response.raise_for_status()
 
@@ -34,7 +33,7 @@ class RSSScraper(BaseScraper):
             filtered = self.filter_articles(articles)
 
             logger.info(f"[{self.name}] Found {len(articles)} articles, {len(filtered)} after filtering")
-            return filtered[:self.max_articles]
+            return filtered[: self.max_articles]
 
         except Exception as e:
             logger.error(f"[{self.name}] RSS fetch failed: {e}")
@@ -83,7 +82,7 @@ class RSSScraper(BaseScraper):
             url=link_elem.text or "",
             source=self.name,
             timestamp=timestamp or datetime.now(),
-            content=desc_elem.text if desc_elem is not None else None
+            content=desc_elem.text if desc_elem is not None else None,
         )
 
     def _parse_atom_entry(self, entry, ns: dict) -> Article | None:
@@ -109,5 +108,5 @@ class RSSScraper(BaseScraper):
             url=href,
             source=self.name,
             timestamp=timestamp or datetime.now(),
-            content=summary_elem.text if summary_elem is not None else None
+            content=summary_elem.text if summary_elem is not None else None,
         )

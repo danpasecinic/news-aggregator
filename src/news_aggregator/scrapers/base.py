@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 import hashlib
+
+from news_aggregator.config import SourceConfig, settings
 
 
 @dataclass
@@ -10,8 +11,8 @@ class Article:
     title: str
     url: str
     source: str
-    timestamp: Optional[datetime] = None
-    content: Optional[str] = None
+    timestamp: datetime | None = None
+    content: str | None = None
 
     @property
     def id(self) -> str:
@@ -25,11 +26,11 @@ class Article:
 
 
 class BaseScraper(ABC):
-    def __init__(self, config: dict):
-        self.config = config
-        self.name = config.get("name", "Unknown")
-        self.keywords = config.get("keywords", [])
-        self.enabled = config.get("enabled", True)
+    def __init__(self, source: SourceConfig):
+        self.source = source
+        self.name = source.name
+        self.keywords = source.keywords
+        self.max_articles = settings.scraping.max_articles_per_source
 
     @abstractmethod
     async def scrape(self) -> list[Article]:
