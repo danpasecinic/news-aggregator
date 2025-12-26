@@ -78,7 +78,7 @@ class NewsAggregator:
             if await self.telegram.send_article(article):
                 self.db.mark_sent(article)
                 sent += 1
-            await asyncio.sleep(1)
+            await asyncio.sleep(3)
 
         return sent
 

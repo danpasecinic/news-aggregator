@@ -17,9 +17,9 @@ from news_aggregator.scrapers.base import Article
 logger = logging.getLogger(__name__)
 
 KYIV_TZ = ZoneInfo("Europe/Kyiv")
-MIN_DELAY = 1.0
-MAX_DELAY = 5.0
-BATCH_SIZE = 10
+MIN_DELAY = 3.0
+MAX_DELAY = 15.0
+BATCH_SIZE = 5
 
 SKIP_PATTERNS = load_skip_patterns()
 
@@ -65,8 +65,11 @@ class TelegramBot:
     def format_message(self, article: Article) -> str:
         time_str = ""
         if article.timestamp:
-            kyiv_time = to_kyiv_time(article.timestamp)
-            time_str = kyiv_time.strftime("%H:%M")
+            if article.language == "uk":
+                time_str = article.timestamp.strftime("%H:%M")
+            else:
+                kyiv_time = to_kyiv_time(article.timestamp)
+                time_str = kyiv_time.strftime("%H:%M")
 
         title = article.title
         if article.language != "uk":
