@@ -2,10 +2,6 @@ import asyncio
 import logging
 import sys
 
-from apscheduler import AsyncScheduler
-from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.interval import IntervalTrigger
-
 from news_aggregator.config import SourceConfig, load_sources, settings
 from news_aggregator.output import TelegramBot
 from news_aggregator.scrapers import RSSScraper, TwitterScraper, WebScraper, PlaywrightScraper
@@ -35,7 +31,8 @@ class NewsAggregator:
                 logger.info(f"Initialized scraper: {source.name}")
         return scrapers
 
-    def _create_scraper(self, source: SourceConfig):
+    @staticmethod
+    def _create_scraper(source: SourceConfig):
         match source.type:
             case "web":
                 return WebScraper(source)
@@ -103,22 +100,21 @@ async def run_scheduler():
     aggregator = NewsAggregator()
     interval = settings.scrape_interval
 
-    async with AsyncScheduler() as scheduler:
-        await scheduler.add_schedule(
-            aggregator.run_cycle,
-            IntervalTrigger(minutes=interval),
-            id="scrape_cycle",
-        )
+    logger.info(f"Starting news aggregator, running every {interval} minutes")
 
-        await scheduler.add_schedule(
-            aggregator.cleanup,
-            CronTrigger(hour=3),
-            id="cleanup",
-        )
+    cycle_count = 0
+    while True:
+        try:
+            await aggregator.run_cycle()
+            cycle_count += 1
 
-        logger.info(f"Scheduler started, running every {interval} minutes")
-        await aggregator.run_cycle()
-        await scheduler.run_until_stopped()
+            if cycle_count % 60 == 0:
+                aggregator.cleanup()
+
+        except Exception as e:
+            logger.error(f"Unexpected error in main loop: {e}", exc_info=True)
+
+        await asyncio.sleep(interval * 60)
 
 
 async def run_once():
