@@ -7,6 +7,7 @@ from deep_translator import GoogleTranslator
 from telegram import Bot
 from telegram.constants import ParseMode
 from telegram.error import RetryAfter, TelegramError
+from telegram.request import HTTPXRequest
 
 from news_aggregator.config import settings
 from news_aggregator.scrapers.base import Article
@@ -38,11 +39,20 @@ class TelegramBot:
     def __init__(self):
         self.token = settings.telegram_bot_token
         self.channel_id = settings.telegram_channel_id
+        self._bot: Bot | None = None
 
     def _get_bot(self) -> Bot:
         if not self.token:
             raise ValueError("TELEGRAM_BOT_TOKEN not set")
-        return Bot(token=self.token)
+        if self._bot is None:
+            request = HTTPXRequest(
+                connect_timeout=30.0,
+                read_timeout=30.0,
+                write_timeout=30.0,
+                pool_timeout=30.0,
+            )
+            self._bot = Bot(token=self.token, request=request)
+        return self._bot
 
     @staticmethod
     def _should_skip(article: Article) -> bool:
@@ -86,16 +96,16 @@ class TelegramBot:
             logger.debug(f"Skipping promo article: {article.title[:50]}")
             return True
 
+        bot = self._get_bot()
         for attempt in range(retries):
             try:
                 message = self.format_message(article)
-                async with self._get_bot() as bot:
-                    await bot.send_message(
-                        chat_id=self.channel_id,
-                        text=message,
-                        parse_mode=ParseMode.MARKDOWN_V2,
-                        disable_web_page_preview=True,
-                    )
+                await bot.send_message(
+                    chat_id=self.channel_id,
+                    text=message,
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                    disable_web_page_preview=True,
+                )
                 logger.info(f"Sent: {article.title[:50]}...")
                 return True
 
@@ -115,12 +125,11 @@ class TelegramBot:
     async def _send_fallback(self, article: Article) -> bool:
         try:
             plain_message = f"{article.icon} {article.source}\n\n{article.title}\n\n🔗 {article.url}"
-            async with self._get_bot() as bot:
-                await bot.send_message(
-                    chat_id=self.channel_id,
-                    text=plain_message,
-                    disable_web_page_preview=True,
-                )
+            await self._get_bot().send_message(
+                chat_id=self.channel_id,
+                text=plain_message,
+                disable_web_page_preview=True,
+            )
             return True
         except TelegramError as e:
             logger.error(f"Fallback also failed: {e}")
@@ -170,13 +179,12 @@ class TelegramBot:
         message = "\n".join(lines)
 
         try:
-            async with self._get_bot() as bot:
-                await bot.send_message(
-                    chat_id=self.channel_id,
-                    text=message,
-                    parse_mode=ParseMode.MARKDOWN_V2,
-                    disable_web_page_preview=True,
-                )
+            await self._get_bot().send_message(
+                chat_id=self.channel_id,
+                text=message,
+                parse_mode=ParseMode.MARKDOWN_V2,
+                disable_web_page_preview=True,
+            )
             logger.info(f"Sent digest with {len(articles)} articles")
             return True
         except TelegramError as e:
