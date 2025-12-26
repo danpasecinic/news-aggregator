@@ -12,7 +12,8 @@ services:
       - ./data:/app/data
       - ./config:/app/config:ro
     healthcheck:
-      test: ["CMD", "python", "-c", "import news_aggregator"]
-      interval: 30s
+      test: ["CMD", "python", "-m", "news_aggregator", "healthcheck"]
+      interval: 60s
       timeout: 10s
       retries: 3
+      start_period: 120s

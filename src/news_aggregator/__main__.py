@@ -1,8 +1,12 @@
 import asyncio
 import logging
 import sys
+import time
+from pathlib import Path
 
 from news_aggregator.config import SourceConfig, load_sources, settings
+
+HEARTBEAT_FILE = Path("/app/data/heartbeat")
 from news_aggregator.output import TelegramBot
 from news_aggregator.scrapers import RSSScraper, TwitterScraper, WebScraper, PlaywrightScraper
 from news_aggregator.scrapers.base import Article
@@ -89,8 +93,17 @@ class NewsAggregator:
             new_count = await self.process_articles(articles)
             sent_count = await self.send_pending()
             logger.info(f"Cycle complete: {len(articles)} scraped, {new_count} new, {sent_count} sent")
+            self._write_heartbeat()
         except Exception as e:
             logger.error(f"Cycle failed: {e}", exc_info=True)
+
+    @staticmethod
+    def _write_heartbeat():
+        try:
+            HEARTBEAT_FILE.parent.mkdir(parents=True, exist_ok=True)
+            HEARTBEAT_FILE.write_text(str(int(time.time())))
+        except Exception as e:
+            logger.warning(f"Failed to write heartbeat: {e}")
 
     def cleanup(self):
         self.db.cleanup_old()
@@ -132,6 +145,22 @@ def show_stats():
         print(f"  {source}: {count}")
 
 
+def check_health() -> bool:
+    max_age = settings.scrape_interval * 60 * 3
+    try:
+        if not HEARTBEAT_FILE.exists():
+            return True
+        last_beat = int(HEARTBEAT_FILE.read_text().strip())
+        age = int(time.time()) - last_beat
+        if age > max_age:
+            print(f"Heartbeat stale: {age}s old (max {max_age}s)")
+            return False
+        return True
+    except Exception as e:
+        print(f"Healthcheck error: {e}")
+        return False
+
+
 def main():
     if len(sys.argv) > 1:
         command = sys.argv[1]
@@ -148,6 +177,9 @@ def main():
             db = Database()
             db.cleanup_old()
             return
+
+        if command == "healthcheck":
+            sys.exit(0 if check_health() else 1)
 
     try:
         asyncio.run(run_scheduler())
