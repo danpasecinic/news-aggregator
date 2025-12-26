@@ -61,16 +61,33 @@ class Settings(BaseSettings):
 
 class SourcesConfig(BaseModel):
     sources: list[SourceConfig] = Field(default_factory=list)
+    skip_patterns: list[str] = Field(default_factory=list)
+
+
+_sources_data: dict | None = None
+
+
+def _load_sources_data(path: str = "config/sources.yaml") -> dict:
+    global _sources_data
+    if _sources_data is None:
+        config_path = Path(path)
+        if not config_path.exists():
+            _sources_data = {}
+        else:
+            with open(config_path) as f:
+                _sources_data = yaml.safe_load(f) or {}
+    return _sources_data
 
 
 def load_sources(path: str = "config/sources.yaml") -> list[SourceConfig]:
-    config_path = Path(path)
-    if not config_path.exists():
-        return []
-    with open(config_path) as f:
-        data = yaml.safe_load(f) or {}
+    data = _load_sources_data(path)
     config = SourcesConfig.model_validate(data)
     return [s for s in config.sources if s.enabled]
+
+
+def load_skip_patterns(path: str = "config/sources.yaml") -> list[str]:
+    data = _load_sources_data(path)
+    return data.get("skip_patterns", [])
 
 
 settings = Settings()

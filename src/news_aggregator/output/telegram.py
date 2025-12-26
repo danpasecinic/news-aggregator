@@ -1,7 +1,9 @@
 import asyncio
 import logging
 import re
+from datetime import datetime, timezone
 from functools import lru_cache
+from zoneinfo import ZoneInfo
 
 from deep_translator import GoogleTranslator
 from telegram import Bot
@@ -9,22 +11,23 @@ from telegram.constants import ParseMode
 from telegram.error import RetryAfter, TelegramError
 from telegram.request import HTTPXRequest
 
-from news_aggregator.config import settings
+from news_aggregator.config import load_skip_patterns, settings
 from news_aggregator.scrapers.base import Article
 
 logger = logging.getLogger(__name__)
 
+KYIV_TZ = ZoneInfo("Europe/Kyiv")
 MIN_DELAY = 1.0
 MAX_DELAY = 5.0
 BATCH_SIZE = 10
 
-SKIP_PATTERNS = [
-    r"t\.me/",
-    r"telegram",
-    r"підписуйся",
-    r"підписатися",
-    r"наш канал",
-]
+SKIP_PATTERNS = load_skip_patterns()
+
+
+def to_kyiv_time(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(KYIV_TZ)
 
 
 @lru_cache(maxsize=500)
@@ -60,7 +63,10 @@ class TelegramBot:
         return any(re.search(p, text, re.IGNORECASE) for p in SKIP_PATTERNS)
 
     def format_message(self, article: Article) -> str:
-        time_str = article.timestamp.strftime("%H:%M") if article.timestamp else ""
+        time_str = ""
+        if article.timestamp:
+            kyiv_time = to_kyiv_time(article.timestamp)
+            time_str = kyiv_time.strftime("%H:%M")
 
         title = article.title
         if article.language == "en":
@@ -166,7 +172,10 @@ class TelegramBot:
         lines = ["📋 *Дайджест новин*\n"]
 
         for article in articles[:15]:
-            time_str = article.timestamp.strftime("%H:%M") if article.timestamp else ""
+            time_str = ""
+            if article.timestamp:
+                kyiv_time = to_kyiv_time(article.timestamp)
+                time_str = kyiv_time.strftime("%H:%M")
             time_part = f" _{time_str}_" if time_str else ""
 
             title = article.title[:80]
