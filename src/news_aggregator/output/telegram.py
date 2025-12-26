@@ -31,9 +31,9 @@ def to_kyiv_time(dt: datetime) -> datetime:
 
 
 @lru_cache(maxsize=500)
-def translate_to_ukrainian(text: str) -> str:
+def translate_to_ukrainian(text: str, source_lang: str = "en") -> str:
     try:
-        return GoogleTranslator(source="en", target="uk").translate(text)
+        return GoogleTranslator(source=source_lang, target="uk").translate(text)
     except Exception:
         return text
 
@@ -69,8 +69,8 @@ class TelegramBot:
             time_str = kyiv_time.strftime("%H:%M")
 
         title = article.title
-        if article.language == "en":
-            title = translate_to_ukrainian(title)
+        if article.language != "uk":
+            title = translate_to_ukrainian(title, article.language)
 
         lines = [f"{article.icon} *{self._escape_md(article.source)}*", "", self._escape_md(title), ""]
 
@@ -179,8 +179,8 @@ class TelegramBot:
             time_part = f" _{time_str}_" if time_str else ""
 
             title = article.title[:80]
-            if article.language == "en":
-                title = translate_to_ukrainian(title)
+            if article.language != "uk":
+                title = translate_to_ukrainian(title, article.language)
             title = self._escape_md(title)
             lines.append(f"{article.icon}{time_part}")
             lines.append(f"[{title}]({article.url})\n")
