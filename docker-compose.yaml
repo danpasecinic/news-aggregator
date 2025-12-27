@@ -12,8 +12,20 @@ services:
       - ./data:/app/data
       - ./config:/app/config:ro
     healthcheck:
-      test: ["CMD", "python", "-m", "news_aggregator", "healthcheck"]
+      test: [ "CMD", "python", "-m", "news_aggregator", "healthcheck" ]
       interval: 60s
       timeout: 10s
       retries: 3
       start_period: 120s
+    labels:
+      - "autoheal=true"
+
+  autoheal:
+    image: willfarrell/autoheal
+    container_name: autoheal
+    restart: unless-stopped
+    environment:
+      - AUTOHEAL_CONTAINER_LABEL=autoheal
+      - AUTOHEAL_INTERVAL=60
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
