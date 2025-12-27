@@ -24,19 +24,33 @@ class PlaywrightScraper(BaseScraper):
 
         articles = []
         try:
-            async with async_playwright() as p:
-                browser = await p.chromium.launch(headless=True)
+            articles = await asyncio.wait_for(
+                self._scrape_with_browser(),
+                timeout=60.0
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"[{self.name}] Playwright scraping timed out after 60s")
+        except Exception as e:
+            logger.error(f"[{self.name}] Playwright scraping failed: {e}")
+
+        filtered = self.filter_articles(articles)
+        logger.info(f"[{self.name}] Found {len(articles)} articles, {len(filtered)} after filtering")
+        return filtered[:self.max_articles]
+
+    async def _scrape_with_browser(self) -> list[Article]:
+        articles = []
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            try:
                 context = await browser.new_context(
                     viewport={"width": 1280, "height": 800},
                     user_agent=settings.scraping.user_agent,
                 )
-
                 page = await context.new_page()
                 await page.goto(self.url, wait_until="networkidle", timeout=30000)
                 await asyncio.sleep(2)
 
                 containers = await page.query_selector_all(self.selectors.container)
-
 
                 for container in containers[:self.max_articles * 2]:
                     try:
@@ -45,15 +59,9 @@ class PlaywrightScraper(BaseScraper):
                             articles.append(article)
                     except Exception as e:
                         logger.debug(f"[{self.name}] Failed to parse article: {e}")
-
+            finally:
                 await browser.close()
-
-        except Exception as e:
-            logger.error(f"[{self.name}] Playwright scraping failed: {e}")
-
-        filtered = self.filter_articles(articles)
-        logger.info(f"[{self.name}] Found {len(articles)} articles, {len(filtered)} after filtering")
-        return filtered[:self.max_articles]
+        return articles
 
     async def _parse_article(self, container) -> Article | None:
         if not self.selectors:
